@@ -1,0 +1,52 @@
+FROM ubuntu:22.04
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apt update && apt install -y mariadb-server iproute2 net-tools iputils-ping && apt clean
+
+# /run/mysqld no existe en un contenedor sin systemd: hay que crearla a mano
+# antes de arrancar el servicio, o mariadb falla al iniciar.
+RUN mkdir -p /run/mysqld && chown mysql:mysql /run/mysqld && \
+    service mariadb start && \
+    mysql -e "CREATE DATABASE labdb; \
+    CREATE TABLE labdb.users (id INT PRIMARY KEY, name VARCHAR(50)); \
+    INSERT INTO labdb.users VALUES (1,'alice'),(2,'bob'); \
+    CREATE USER 'webuser'@'%' IDENTIFIED BY 'Lab#2026'; \
+    GRANT SELECT ON labdb.* TO 'webuser'@'%'; \
+    FLUSH PRIVILEGES;" && \
+    sed -i "s/^bind-address.*/bind-address = 0.0.0.0/" /etc/mysql/mariadb.conf.d/50-server.cnf
+
+# Valores por defecto (subred DB: 10.6.97.16/28)
+ENV IP_ADDR=10.6.97.18
+ENV PREFIX=28
+ENV GATEWAY=10.6.97.17
+
+COPY start-network.sh /start-network.sh
+RUN chmod +x /start-network.sh
+CMD ["/start-network.sh"]
+
+
+
+#!/bin/bash
+set -e
+
+IP_ADDR="${IP_ADDR:-10.6.97.18}"
+PREFIX="${PREFIX:-28}"
+GATEWAY="${GATEWAY:-10.6.97.17}"
+
+if ! ip link show eth0 >/dev/null 2>&1; then
+  echo "!! ERROR: la interfaz eth0 no existe. Interfaces disponibles:"
+  ip -o link show
+  exit 1
+fi
+
+echo ">> DB-Server: configurando eth0 con ${IP_ADDR}/${PREFIX}, gateway ${GATEWAY}"
+
+ip addr flush dev eth0
+ip addr add ${IP_ADDR}/${PREFIX} dev eth0
+ip link set eth0 up
+ip route replace default via ${GATEWAY}
+
+mkdir -p /run/mysqld && chown mysql:mysql /run/mysqld
+service mariadb start
+echo ">> DB-Server listo."
+tail -f /dev/null
