@@ -8,7 +8,7 @@
 
 ## 🎥 Video demostrativo
 
-[VIDEO PENDIENTE DE INCORPORAR]
+[(https://www.youtube.com/watch?v=7HyGDk8jk1o]
 
 > Cuando esté disponible, colocar el enlace aquí y/o el archivo en [`video/`](video/). Ver instrucciones en [`video/README.md`](video/README.md).
 
